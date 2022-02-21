@@ -70,6 +70,21 @@ typedef struct HyperParam {
 	float hand_detect_thres; //手掌检测的置信度,范围为0-1之间的小数，默认为0.85,检测不到手掌时请调小该值，将其他物体误认为手掌时请调大该值
 } HyperParam;
 
+struct detection_box
+{
+	float xmin = 0;
+	float xmax = 0;
+	float ymin = 0;
+	float ymax = 0;
+	float score = 0;
+};
+
+struct DetHands
+{
+	detection_box l_hand;
+	detection_box r_hand;
+};
+
 struct detRect
 {
 	cv::Mat img;
@@ -199,16 +214,12 @@ struct handLandmarks
 	vector<Ort::Session*> sessions;
 	cv::Mat_<float> anchors;
 	cv::Mat image_gestures;
-	HyperParam hyper_params;
 };
 
 char* modelDecryption(ifstream &inFile, string &pwd, int encrypt_num, int model_size);
 Ort::Session* sessionInit(string modelPath, int decrypt_num, string pwd);
 
-extern "C" _declspec(dllexport) void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_staGesRecModel, const char* p_handGesRecModel,
-	const char* p_handFeatModel, const char* p_anchorFile, HyperParam hyper_params); 
-//handLandmarks_Init(const char* p_palmDetModel, const char* p_handGesRecModel,
-//	const char* p_handFeatModel, const char* p_anchorFile);
-extern "C" _declspec(dllexport) int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, float* hand_region, bool debug_print);
+extern "C" _declspec(dllexport) void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anchorFile);
+extern "C" _declspec(dllexport) int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, DetHands &hands, bool debug_print);
 void decodeBoxes(const cv::Mat& rawBoxes, const cv::Mat& rawScores, const cv::Mat & anchors, std::vector<BoxInfo> & boxes);
 void nms(std::vector<BoxInfo>& input_boxes, float NMS_THRESH);
