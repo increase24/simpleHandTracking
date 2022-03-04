@@ -177,7 +177,7 @@ void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anc
 	return handLdks;
 }
 
-int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, DetHands &hand_regions, bool debug_print)
+int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, float* hand_regions, bool debug_print)
 {
 	static handLandmarks* handLdks = (handLandmarks*)(p_self);
 	static Ort::Session* sess_palmDet = handLdks->sessions[0];
@@ -339,11 +339,16 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 			handCenterX = (xminOri + xmaxOri) / 2;
 			handCenterY = (yminOri + ymaxOri) / 2;
 
-			hand_regions.r_hand.xmin = detectionBox.x1;
+			/*hand_regions.r_hand.xmin = detectionBox.x1;
 			hand_regions.r_hand.ymin = detectionBox.y1;
 			hand_regions.r_hand.xmax = detectionBox.x2;
 			hand_regions.r_hand.ymax = detectionBox.y2;
-			hand_regions.r_hand.score = max_score;
+			hand_regions.r_hand.score = max_score;*/
+			hand_regions[0] = detectionBox.x1;
+			hand_regions[1] = detectionBox.y1;
+			hand_regions[2] = detectionBox.x2;
+			hand_regions[3] = detectionBox.y2;
+			hand_regions[4] = max_score;
 
 			cv::Point2f handUp = cv::Point2f(kpts.at<float>(0, palmUpId * 2), kpts.at<float>(0, palmUpId * 2 + 1)),
 				handDown = cv::Point2f(kpts.at<float>(0, palmDownId * 2), kpts.at<float>(0, palmDownId * 2 + 1));

@@ -35,19 +35,20 @@ int main()
 		auto stop1 = chrono::high_resolution_clock::now();
 		rawFrame.copyTo(showFrame);
 		//cv::flip(showFrame, showFrame, +1);
-		DetHands output;
+		//DetHands output;
+		float output[5];
 		int result = handLandmarks_inference(p_session, rawFrame.data, video_shape, output, false);
 
 		// fps setup
 		auto stop2 = chrono::high_resolution_clock::now();
 		auto infer_time1 = chrono::duration_cast<chrono::milliseconds>(stop2 - stop1).count();
 		cout << "推理时间（ms）:" << infer_time1 << endl;
-		cout << "右手检测置信度:" << output.r_hand.score << endl;
+		cout << "右手检测置信度:" << output[4] << endl;
 		float threshold = 0.95;
-		if(output.r_hand.score > threshold)
+		if(output[4] > threshold)
 		{
-			cv::rectangle(showFrame, cv::Point(output.r_hand.xmin * rawWidth, output.r_hand.ymin* rawHeight),
-				cv::Point(output.r_hand.xmax * rawWidth, output.r_hand.ymax* rawHeight), cv::Scalar(0, 255,0),1,1,0);
+			cv::rectangle(showFrame, cv::Point(output[0] * rawWidth, output[1] * rawHeight),
+				cv::Point(output[2] * rawWidth, output[3] * rawHeight), cv::Scalar(0, 255,0),1,1,0);
 		}
 
 		cv::imshow("handDetection", showFrame);

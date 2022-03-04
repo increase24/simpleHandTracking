@@ -15,5 +15,5 @@ struct DetHands
 };
 
 extern "C" _declspec(dllexport) void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anchorFile);
-extern "C" _declspec(dllexport) int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, DetHands &hands, bool debug_print);
+extern "C" _declspec(dllexport) int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, float* hands, bool debug_print);
 

@@ -220,6 +220,6 @@ char* modelDecryption(ifstream &inFile, string &pwd, int encrypt_num, int model_
 Ort::Session* sessionInit(string modelPath, int decrypt_num, string pwd);
 
 extern "C" _declspec(dllexport) void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anchorFile);
-extern "C" _declspec(dllexport) int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, DetHands &hands, bool debug_print);
+extern "C" _declspec(dllexport) int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, float* hands, bool debug_print);
 void decodeBoxes(const cv::Mat& rawBoxes, const cv::Mat& rawScores, const cv::Mat & anchors, std::vector<BoxInfo> & boxes);
 void nms(std::vector<BoxInfo>& input_boxes, float NMS_THRESH);
