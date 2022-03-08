@@ -37,7 +37,7 @@ int main()
 		//cv::flip(showFrame, showFrame, +1);
 		//DetHands output;
 		float output[5];
-		int result = handLandmarks_inference(p_session, rawFrame.data, video_shape, output, false);
+		int result = handLandmarks_inference(p_session, rawFrame.data, video_shape, output, true);
 
 		// fps setup
 		auto stop2 = chrono::high_resolution_clock::now();

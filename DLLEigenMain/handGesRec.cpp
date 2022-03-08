@@ -158,8 +158,10 @@ void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anc
 	//fstream fin(anchorFile, ios::in | ios::binary);
 	//fin.read((char *)anchors.data_ptr(), anchors.numel() * sizeof(float));
 
-	/* ---- init ONNX rt ---- */
+	fstream fout("./debug.txt", ios::out | ios::binary);
+	fout << "Successfully initialize the models!" << endl;
 
+	/* ---- init ONNX rt ---- */
 	////Ort::AllocatorWithDefaultOptions allocator;
 	//std::vector<int64_t> palm_input_node_dims = { batchSizePalm, 3, modelHeight, modelWidth };
 	//size_t palm_input_tensor_size = batchSizePalm * 3 * modelHeight * modelWidth;
@@ -190,7 +192,11 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 	int img_w = image_shape[1];
 	// convert unsigned char* to cv::Mat
 	cv::Mat rawFrame(img_h, img_w, CV_8UC3, _input);
-
+	if (debug_print)
+	{
+		fstream fout("./debug.txt", ios::app);
+		fout << "Successfully decode input image!" << endl;
+	}
 	//static configuration
 	static Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 	//static int modelWidth = 256, modelHeight = 256, modelWidth_GesRec = 224, modelHeight_GesRec = 224;
@@ -271,6 +277,11 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 	int showHeightOri = cropHeight, showWidthOri = cropWidth;
 	cropFrame.copyTo(showFrameOri);
 	
+	if (debug_print)
+	{
+		fstream fout("./debug.txt", ios::app);
+		fout << "Successfully crop image!" << endl;
+	}
 
 	/* --------------------------------------- perform palm detection ------------------------------------- */
 	if (handMetaForward.empty())
@@ -290,9 +301,11 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 		auto output_tensors = sess_palmDet->Run(Ort::RunOptions(nullptr), input_node_names.data(), &inputTensor_ort, 1, output_node_names.data(), 2);
 		auto stop2 = chrono::high_resolution_clock::now();
 		auto infer_time1 = chrono::duration_cast<chrono::milliseconds>(stop2 - stop1).count();
+		
 		if (debug_print)
 		{
-			cout << "hand detection time cost:" << infer_time1 << "ms" << endl;
+			fstream fout("./debug.txt", ios::app);
+			fout << "hand detection time cost:" << infer_time1 << "ms" << endl;
 		}
 		float* rawBoxesPPtr = output_tensors[0].GetTensorMutableData<float>(); // bounding box
 		float* rawScoresPPtr = output_tensors[1].GetTensorMutableData<float>(); // confidence
@@ -355,12 +368,20 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 
 			if (max_score > handThrs)
 			{
-				if (debug_print) {
-					cout << "max_score: " << max_score << endl;
+				if (debug_print)
+				{
+					fstream fout("./debug.txt", ios::app);
+					fout << "Palm detection score: " << max_score << endl;
 				}
 				handMetaForward.push_back(detMeta(xmin, ymin, xmax, ymax, handUp, handDown, 0));
 				handMetaForwardOri.push_back(detMeta(xminOri, yminOri, xmaxOri, ymaxOri, handUp, handDown, 0));
 				//cv::rectangle(showFrame, cv::Rect(int(xmin), int(ymin), int(xmax - xmin), int(ymax - ymin)), cv::Scalar(0, 0, 255), 1, 1, 0);
+			}
+
+			if (debug_print)
+			{
+				fstream fout("./debug.txt", ios::app);
+				fout << "Successfully decode palm detection results!" << endl;
 			}
 		}
 	}
