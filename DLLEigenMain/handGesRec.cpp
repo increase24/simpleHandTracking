@@ -158,7 +158,7 @@ void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anc
 	//fstream fin(anchorFile, ios::in | ios::binary);
 	//fin.read((char *)anchors.data_ptr(), anchors.numel() * sizeof(float));
 
-	fstream fout("./debug.txt", ios::out | ios::binary);
+	fstream fout("D:\\debug.txt", ios::out | ios::binary);
 	fout << "Successfully initialize the models!" << endl;
 
 	/* ---- init ONNX rt ---- */
@@ -191,10 +191,12 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 	int img_h = image_shape[0];
 	int img_w = image_shape[1];
 	// convert unsigned char* to cv::Mat
-	cv::Mat rawFrame(img_h, img_w, CV_8UC3, _input);
+	cv::Mat rawFrame_rgba(img_h, img_w, CV_8UC4, _input);
+	cv::Mat rawFrame;
+	cv::cvtColor(rawFrame_rgba, rawFrame, cv::COLOR_BGRA2BGR);
 	if (debug_print)
 	{
-		fstream fout("./debug.txt", ios::app);
+		fstream fout("D:\\debug.txt", ios::app);
 		fout << "Successfully decode input image!" << endl;
 	}
 	//static configuration
@@ -276,10 +278,11 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 	// float swip_dist_thresh = cropHeight * hyper_params.swip_dist_thres;
 	int showHeightOri = cropHeight, showWidthOri = cropWidth;
 	cropFrame.copyTo(showFrameOri);
-	
+	cv::imshow("show frame", showFrameOri);
+	//cv::imwrite("D:\\show_frame.jpg", showFrameOri);
 	if (debug_print)
 	{
-		fstream fout("./debug.txt", ios::app);
+		fstream fout("D:\\debug.txt", ios::app);
 		fout << "Successfully crop image!" << endl;
 	}
 
@@ -304,7 +307,7 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 		
 		if (debug_print)
 		{
-			fstream fout("./debug.txt", ios::app);
+			fstream fout("D:\\debug.txt", ios::app);
 			fout << "hand detection time cost:" << infer_time1 << "ms" << endl;
 		}
 		float* rawBoxesPPtr = output_tensors[0].GetTensorMutableData<float>(); // bounding box
@@ -370,7 +373,7 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 			{
 				if (debug_print)
 				{
-					fstream fout("./debug.txt", ios::app);
+					fstream fout("D:\\debug.txt", ios::app);
 					fout << "Palm detection score: " << max_score << endl;
 				}
 				handMetaForward.push_back(detMeta(xmin, ymin, xmax, ymax, handUp, handDown, 0));
@@ -380,7 +383,7 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 
 			if (debug_print)
 			{
-				fstream fout("./debug.txt", ios::app);
+				fstream fout("D:\\debug.txt", ios::app);
 				fout << "Successfully decode palm detection results!" << endl;
 			}
 		}

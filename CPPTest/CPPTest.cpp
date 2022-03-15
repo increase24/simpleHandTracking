@@ -32,12 +32,14 @@ int main()
 	int last_gest = 0;
 	while (cap.read(rawFrame))
 	{
+		cv::Mat frame_rgba;
+		cv::cvtColor(rawFrame, frame_rgba, cv::COLOR_BGR2BGRA);
 		auto stop1 = chrono::high_resolution_clock::now();
 		rawFrame.copyTo(showFrame);
 		//cv::flip(showFrame, showFrame, +1);
 		//DetHands output;
 		float output[5];
-		int result = handLandmarks_inference(p_session, rawFrame.data, video_shape, output, true);
+		int result = handLandmarks_inference(p_session, frame_rgba.data, video_shape, output, true);
 
 		// fps setup
 		auto stop2 = chrono::high_resolution_clock::now();
