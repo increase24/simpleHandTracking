@@ -20,11 +20,10 @@ using namespace std;
 //using namespace Eigen;
 
 # define M_PI 3.1415926
-const int modelWidth = 256, modelHeight = 256, modelWidth_GesRec = 128, modelHeight_GesRec = 128, seqLen = 9, embedDim = 255;
-const int modelWidth_GesRec_static = 224, modelHeight_GesRec_static = 224;
+const int modelWidth = 256, modelHeight = 256, modelWidth_handKpts = 224, modelHeight_handKpts = 224;
 const int numAnchors = 2944 , outDim = 18, batchSizePalm = 1, batchSizeHand = 1, numGestures = 17; // 896
 const int numKeypointsPalm = 7, numKeypointsHand = 21, numJointConnect = 20, palmDetFreq = 20;
-const float scoreClipThrs = 100.0, minScoreThrs = 0.66, minSuppressionThrs = 0.3; //handThrs = 0.85;
+const float scoreClipThrs = 100.0, minScoreThrs = 0.75, minSuppressionThrs = 0.3; //handThrs = 0.85;
 float handThrs = 0.85;
 const float palm_shift_y = 0.5, palm_shift_x = 0, palm_box_scale = 2.6,
 hand_shift_y = 0, hand_shift_x = 0, hand_box_scale = 2.1;
@@ -219,7 +218,7 @@ struct handLandmarks
 char* modelDecryption(ifstream &inFile, string &pwd, int encrypt_num, int model_size);
 Ort::Session* sessionInit(string modelPath, int decrypt_num, string pwd);
 
-extern "C" _declspec(dllexport) void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anchorFile);
+extern "C" _declspec(dllexport) void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_handKptsModel, const char* p_anchorFile);
 extern "C" _declspec(dllexport) int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, float* hands, bool debug_print);
 void decodeBoxes(const cv::Mat& rawBoxes, const cv::Mat& rawScores, const cv::Mat & anchors, std::vector<BoxInfo> & boxes);
 void nms(std::vector<BoxInfo>& input_boxes, float NMS_THRESH);

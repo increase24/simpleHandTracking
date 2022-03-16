@@ -15,9 +15,10 @@ int main()
 {
 	/* -----------  init model inference session  ----------- */
 	const char* pamlDetModelPath = "./models/palm_detection.dat";
+	const char* handKptsModelPath = "./models/hand_landmarks_v2.dat";
 	const char* anchorFilePath = "./models/anchors.bin";
 	int fps = 30; // set inference fps
-	void* p_session = handLandmarks_Init(pamlDetModelPath, anchorFilePath);
+	void* p_session = handLandmarks_Init(pamlDetModelPath, handKptsModelPath, anchorFilePath);
 	cout << "load model done." << endl;
 
 	cv::Mat rawFrame, showFrame, image_gestures_copy;
@@ -38,19 +39,25 @@ int main()
 		rawFrame.copyTo(showFrame);
 		//cv::flip(showFrame, showFrame, +1);
 		//DetHands output;
-		float output[5];
+		float* output = new float[10];
 		int result = handLandmarks_inference(p_session, frame_rgba.data, video_shape, output, true);
 
 		// fps setup
 		auto stop2 = chrono::high_resolution_clock::now();
 		auto infer_time1 = chrono::duration_cast<chrono::milliseconds>(stop2 - stop1).count();
 		cout << "推理时间（ms）:" << infer_time1 << endl;
-		cout << "右手检测置信度:" << output[4] << endl;
+		cout << "左手检测置信度:" << output[4] << endl;
+		cout << "右手检测置信度:" << output[9] << endl;
 		float threshold = 0.95;
 		if(output[4] > threshold)
 		{
 			cv::rectangle(showFrame, cv::Point(output[0] * rawWidth, output[1] * rawHeight),
 				cv::Point(output[2] * rawWidth, output[3] * rawHeight), cv::Scalar(0, 255,0),1,1,0);
+		}
+		if (output[9] > threshold)
+		{
+			cv::rectangle(showFrame, cv::Point(output[5] * rawWidth, output[6] * rawHeight),
+				cv::Point(output[7] * rawWidth, output[8] * rawHeight), cv::Scalar(0, 255, 0), 1, 1, 0);
 		}
 
 		cv::imshow("handDetection", showFrame);
@@ -59,6 +66,7 @@ int main()
 			cv::destroyAllWindows();
 			return -1;
 		};
+		delete output;
 	}
 }
 

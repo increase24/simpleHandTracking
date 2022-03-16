@@ -14,6 +14,6 @@ struct DetHands
 	detection_box r_hand;
 };
 
-extern "C" _declspec(dllexport) void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anchorFile);
+extern "C" _declspec(dllexport) void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_handKptsModel, const char* p_anchorFile);
 extern "C" _declspec(dllexport) int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shape, float* hands, bool debug_print);
 

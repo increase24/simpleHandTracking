@@ -136,19 +136,20 @@ cv::Mat mat2chw(cv::Mat inFrame)
 	return frameCHW;
 }
 
-void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anchorFile)
+void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_handKptsModel, const char* p_anchorFile)
 {
 	//cv::Mat padding = load_gestureImg(gesture_classes);
 	// file vars
 	string anchorFile = p_anchorFile;
 	string palmModel = p_palmDetModel;
+	string handModel = p_handKptsModel;
 	//string staGesModel = p_staGesRecModel;
 	//string gesFeatModel = p_handFeatModel;
 	//string gesModel = p_handGesRecModel;
 
 	Ort::Session* sessionPalm = sessionInit(palmModel, 4444, "Adasd@#4s24!3da");
-	/*Ort::Session* sessionSta = sessionInit(staGesModel, 6666, "Z0hRAJmCkGBHpkJ2*");
-	Ort::Session* sessionFeat = sessionInit(gesFeatModel, 7777, "z0hrajmckgbhpkj2*");
+	Ort::Session* sessionHand = sessionInit(handModel, 7777, "CR2NX8MVxe0hz&0*");
+	/*Ort::Session* sessionFeat = sessionInit(gesFeatModel, 7777, "z0hrajmckgbhpkj2*");
 	Ort::Session* sessionGes = sessionInit(gesModel, 6666, "Z0hRAJmCkGBHpkJ2*");*/
 
 	/* ---- load anchor binary file ---- */
@@ -174,6 +175,7 @@ void* __stdcall handLandmarks_Init(const char* p_palmDetModel, const char* p_anc
 
 	handLandmarks* handLdks = new handLandmarks();
 	handLdks->sessions.push_back(sessionPalm);
+	handLdks->sessions.push_back(sessionHand);
 	handLdks->anchors = anchors_cvMat;
 
 	return handLdks;
@@ -183,7 +185,7 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 {
 	static handLandmarks* handLdks = (handLandmarks*)(p_self);
 	static Ort::Session* sess_palmDet = handLdks->sessions[0];
-	//static Ort::Session* sess_handGesStatic = handLdks->sessions[1];
+	static Ort::Session* sess_handKpts = handLdks->sessions[1];
 	//static Ort::Session* sess_handFeat = handLdks->sessions[2];
 	//static Ort::Session* sess_handGesRec = handLdks->sessions[3];
 
@@ -203,20 +205,15 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 	static Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
 	//static int modelWidth = 256, modelHeight = 256, modelWidth_GesRec = 224, modelHeight_GesRec = 224;
 	static size_t palm_input_tensor_size = batchSizePalm * 3 * modelHeight * modelWidth;
+	static size_t hand_input_tensor_size = 1 * 3 * modelHeight_handKpts * modelWidth_handKpts;
 	static std::vector<int64_t> palm_input_node_dims = { batchSizePalm, 3, modelHeight, modelWidth };
+	static std::vector<int64_t> hand_input_node_dims = { 1, modelHeight_handKpts, modelWidth_handKpts, 3};
 	static std::vector<const char *> input_node_names = { "input" };
 	static std::vector<const char *> output_node_names = { "output1", "output2" };
-	/*static std::vector<const char *> input_node_name_Feat = { "input" };
-	static std::vector<const char *> input_node_name_GesRec = { "input" };
-	static std::vector<const char *> output_node_name_GesRec = { "output" };
-	static std::vector<const char *> output_node_name_Feat = { "output" };
-	static std::vector<const char *> input_node_name_sta = { "input" };
-	static std::vector<const char *> output_node_name_sta = { "output" };*/
-	static cv::Mat input_seq_img(batchSizeHand, seqLen * embedDim, CV_32FC1);
-	static cv::Mat input_seq_img_tmp(batchSizeHand, seqLen * embedDim, CV_32FC1);
+	static std::vector<const char *> input_node_name_handKpts = { "input_1" };
+	static std::vector<const char *> output_node_name_handKpts = { "Identity", "Identity_1", "Identity_2" };
+
 	static deque<cv::Point2f> swip_mov_dist;
-	input_seq_img_tmp = cv::Scalar(0);
-	static int frameOffset = embedDim;  //3 * modelHeight_GesRec * modelWidth_GesRec;
 	static int counter_frame = 0;
 	static int counter_frame_sta = 0;
 	int last_idx_max = 0;
@@ -229,7 +226,7 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 
 	// queue of palm bbox and hand region
 	static deque<detRect> cropHands, cropHandsOri;
-	static deque<detMeta> handMetaForward, handMetaForwardOri;
+	static deque<detMeta> handMetaForwardOri;
 	static ofstream record_log;
 	cv::Mat frame, cropFrame, paddingFrame, centerCropFrame, inFrame, tmpFrame, showFrame, showFrameOri, resizeFrame, gesInpFrame;
 	//torch::Tensor inputRawTensor, inputTensor, rawBoxesP, rawScoresP;
@@ -278,7 +275,7 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 	// float swip_dist_thresh = cropHeight * hyper_params.swip_dist_thres;
 	int showHeightOri = cropHeight, showWidthOri = cropWidth;
 	cropFrame.copyTo(showFrameOri);
-	cv::imshow("show frame", showFrameOri);
+	
 	//cv::imwrite("D:\\show_frame.jpg", showFrameOri);
 	if (debug_print)
 	{
@@ -286,8 +283,10 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 		fout << "Successfully crop image!" << endl;
 	}
 
+	BoxInfo bbox[2];
+	float score_bbox[2];
 	/* --------------------------------------- perform palm detection ------------------------------------- */
-	if (handMetaForward.empty())
+	if (handMetaForwardOri.empty())
 	{
 		cv::resize(cropFrame, inFrame, cv::Size(modelWidth, modelHeight), 0, 0, cv::INTER_LINEAR);
 		int showHeight = inFrame.rows, showWidth = inFrame.cols;
@@ -327,77 +326,132 @@ int __stdcall handLandmarks_inference(void* p_self, void* image, int* image_shap
 
 		for (int i = 0; i < batchSizePalm; i++)
 		{
-			// select the bbox with the highest confidence
-			int opt_idx = 0;
-			float max_score = 0.0f;
+			// select the bboxs with the highest and the second highest confidence
+			int opt_idx = 0, opt_idx_2 = 0;
+			float max_score = 0.0f, max_score_2 = 0.0f;
 			for (int idx = 0; idx < detectionBoxes.size(); idx++) {
 				float score = detectionBoxes[idx].score;
 				if (score > max_score && score > handThrs) {
 					max_score = score;
 					opt_idx = idx;
 				}
-			}
-			
-			detectionBox = detectionBoxes[opt_idx];
-			outputBox = detectionBoxes[opt_idx];
-
-			auto ymin = detectionBox.y1 * showHeight;
-			auto xmin = detectionBox.x1 * showWidth;
-			auto ymax = detectionBox.y2 * showHeight;
-			auto xmax = detectionBox.x2 * showWidth;
-
-			auto yminOri = detectionBox.y1 * showHeightOri;
-			auto xminOri = detectionBox.x1 * showWidthOri;
-			auto ymaxOri = detectionBox.y2 * showHeightOri;
-			auto xmaxOri = detectionBox.x2 * showWidthOri;
-
-			auto kpts = detectionBox.kpts;
-			handCenterX = (xminOri + xmaxOri) / 2;
-			handCenterY = (yminOri + ymaxOri) / 2;
-
-			/*hand_regions.r_hand.xmin = detectionBox.x1;
-			hand_regions.r_hand.ymin = detectionBox.y1;
-			hand_regions.r_hand.xmax = detectionBox.x2;
-			hand_regions.r_hand.ymax = detectionBox.y2;
-			hand_regions.r_hand.score = max_score;*/
-			hand_regions[0] = detectionBox.x1;
-			hand_regions[1] = detectionBox.y1;
-			hand_regions[2] = detectionBox.x2;
-			hand_regions[3] = detectionBox.y2;
-			hand_regions[4] = max_score;
-
-			cv::Point2f handUp = cv::Point2f(kpts.at<float>(0, palmUpId * 2), kpts.at<float>(0, palmUpId * 2 + 1)),
-				handDown = cv::Point2f(kpts.at<float>(0, palmDownId * 2), kpts.at<float>(0, palmDownId * 2 + 1));
-
-			if (max_score > handThrs)
-			{
-				if (debug_print)
-				{
-					fstream fout("D:\\debug.txt", ios::app);
-					fout << "Palm detection score: " << max_score << endl;
+				else if (score > max_score_2 && score > handThrs) {
+					max_score_2 = score;
+					opt_idx_2 = idx;
 				}
-				handMetaForward.push_back(detMeta(xmin, ymin, xmax, ymax, handUp, handDown, 0));
-				handMetaForwardOri.push_back(detMeta(xminOri, yminOri, xmaxOri, ymaxOri, handUp, handDown, 0));
-				//cv::rectangle(showFrame, cv::Rect(int(xmin), int(ymin), int(xmax - xmin), int(ymax - ymin)), cv::Scalar(0, 0, 255), 1, 1, 0);
 			}
+			int opt_idxs[2] = { opt_idx ,opt_idx_2 };
+			float max_scores[2] = { max_score , max_score_2 };
 
-			if (debug_print)
+			for (int i_bbox = 0; i_bbox<2;i_bbox++)
 			{
-				fstream fout("D:\\debug.txt", ios::app);
-				fout << "Successfully decode palm detection results!" << endl;
+				int _idx = opt_idxs[i_bbox];
+				float _score = max_scores[i_bbox];
+
+				detectionBox = detectionBoxes[i_bbox];
+				outputBox = detectionBoxes[i_bbox];
+
+				auto ymin = detectionBox.y1 * showHeight;
+				auto xmin = detectionBox.x1 * showWidth;
+				auto ymax = detectionBox.y2 * showHeight;
+				auto xmax = detectionBox.x2 * showWidth;
+
+				auto yminOri = detectionBox.y1 * showHeightOri;
+				auto xminOri = detectionBox.x1 * showWidthOri;
+				auto ymaxOri = detectionBox.y2 * showHeightOri;
+				auto xmaxOri = detectionBox.x2 * showWidthOri;
+
+				auto kpts = detectionBox.kpts;
+				handCenterX = (xminOri + xmaxOri) / 2;
+				handCenterY = (yminOri + ymaxOri) / 2;
+
+				/*hand_regions[0] = detectionBox.x1;
+				hand_regions[1] = detectionBox.y1;
+				hand_regions[2] = detectionBox.x2;
+				hand_regions[3] = detectionBox.y2;
+				hand_regions[4] = max_score;*/
+				bbox[i_bbox] = detectionBox;
+				score_bbox[i_bbox] = _score;
+
+				/*cv::rectangle(showFrameOri, cv::Point(detectionBox.x1 * showFrameOri.cols, detectionBox.y1  * showFrameOri.rows),
+					cv::Point(detectionBox.x2 * showFrameOri.cols, detectionBox.y2 * showFrameOri.rows), cv::Scalar(0, 255, 0), 1, 1, 0);*/
+			
+				cv::Point2f handUp = cv::Point2f(kpts.at<float>(0, palmUpId * 2), kpts.at<float>(0, palmUpId * 2 + 1)),
+					handDown = cv::Point2f(kpts.at<float>(0, palmDownId * 2), kpts.at<float>(0, palmDownId * 2 + 1));
+
+				if (max_score > handThrs)
+				{
+					//handMetaForward.push_back(detMeta(xmin, ymin, xmax, ymax, handUp, handDown, 0));
+					handMetaForwardOri.push_back(detMeta(xminOri, yminOri, xmaxOri, ymaxOri, handUp, handDown, 0));
+					//cv::rectangle(showFrame, cv::Rect(int(xmin), int(ymin), int(xmax - xmin), int(ymax - ymin)), cv::Scalar(0, 0, 255), 1, 1, 0);
+				}
 			}
 		}
 	}
 
-	while (!handMetaForward.empty())
+	while (!handMetaForwardOri.empty())
 	{
-		cropHands.push_back(handMetaForward.front().getTransformedRect(resizeFrame));
+		//cropHands.push_back(handMetaForward.front().getTransformedRect(resizeFrame));
 		cropHandsOri.push_back(handMetaForwardOri.front().getTransformedRect(showFrameOri));
 		//cv::circle(showFrame, cropHands.front().rawCenter, 2, { 255, 0, 0 }, 2);
-		handMetaForward.pop_front();
+		//handMetaForward.pop_front();
 		handMetaForwardOri.pop_front();
 	}
 	//
 	/* ----------------- Hand Keypoint Detection NN Inference ---------------------- */
+	int batchSizeHand = cropHandsOri.size();
+	if (batchSizeHand)
+	{
+		for (int i_hand=0; i_hand< batchSizeHand; i_hand++)
+		{
+			auto cropHand = cropHandsOri.front();
+			cv::Mat cropImage_Affine;
+			resize(cropHand.img, cropImage_Affine, cv::Size(modelWidth_handKpts, modelHeight_handKpts), 0, 0, cv::INTER_LINEAR);
+			cv::cvtColor(cropImage_Affine, cropImage_Affine, cv::COLOR_BGR2RGB);
+			cropImage_Affine.convertTo(cropImage_Affine, CV_32F);
+			cropImage_Affine = cropImage_Affine / 127.5 - 1.0;
+			//cv::Mat cropFrameCHW = mat2chw(cropImage_Affine);
+			cv::Mat cropFrameCHW = cropImage_Affine;
+			Ort::Value input_ort = Ort::Value::CreateTensor<float>(memory_info, (float_t *)cropFrameCHW.data, hand_input_tensor_size, hand_input_node_dims.data(), 4);
+			auto output_tensors = sess_handKpts->Run(Ort::RunOptions(nullptr), input_node_name_handKpts.data(), &input_ort, 1, output_node_name_handKpts.data(), 3);
+			//float* rawBoxesPPtr = output_tensors[0].GetTensorMutableData<float>(); // bounding box
+			float* score_hand = output_tensors[1].GetTensorMutableData<float>(); // confidence
+			float* handness = output_tensors[2].GetTensorMutableData<float>(); // left hand->0; right hand->1
+			//cout << "score_hand:" << score_hand[0] << endl;
+			if (handness[0] > 0.9&&score_hand[0]>0.9) //right hand
+			{
+				hand_regions[5] = bbox[i_hand].x1;
+				hand_regions[6] = bbox[i_hand].y1;
+				hand_regions[7] = bbox[i_hand].x2;
+				hand_regions[8] = bbox[i_hand].y2;
+				hand_regions[9] = score_bbox[i_hand];
+			}
+			else if (handness[0] < 0.1 && score_hand[0]>0.9) //left hand
+			{
+				hand_regions[0] = bbox[i_hand].x1;
+				hand_regions[1] = bbox[i_hand].y1;
+				hand_regions[2] = bbox[i_hand].x2;
+				hand_regions[3] = bbox[i_hand].y2;
+				hand_regions[4] = score_bbox[i_hand];
+			}
+			//if (i_hand == 0)
+			//{
+			//	hand_regions[5] = bbox[i_hand].x1;
+			//	hand_regions[6] = bbox[i_hand].y1;
+			//	hand_regions[7] = bbox[i_hand].x2;
+			//	hand_regions[8] = bbox[i_hand].y2;
+			//	hand_regions[9] = score_bbox[i_hand];
+			//}
+			//else
+			//{
+			//	hand_regions[0] = bbox[i_hand].x1;
+			//	hand_regions[1] = bbox[i_hand].y1;
+			//	hand_regions[2] = bbox[i_hand].x2;
+			//	hand_regions[3] = bbox[i_hand].y2;
+			//	hand_regions[4] = score_bbox[i_hand];
+			//}
+			cropHandsOri.pop_front();
+		}
+	}
 	return 0;
 }
